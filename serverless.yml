@@ -37,7 +37,7 @@ custom:
       - AWS_REGION
 
 functions:
-  api:
+  app:
     handler: lambda.handler
     events:
       - httpApi:
