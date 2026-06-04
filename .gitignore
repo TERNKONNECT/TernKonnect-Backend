@@ -32,3 +32,5 @@ dist-ssr
 *.tfvars.json
 .terraform.lock.hcl
 
+
+.serverless
