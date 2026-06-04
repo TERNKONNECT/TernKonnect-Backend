@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "nodemon --require dotenv/config server.js",
     "start": "node server.js",
+    "db:sync": "node --require dotenv/config scripts/sync-db.js",
     "build": "echo 'No build step needed'"
   },
   "dependencies": {
