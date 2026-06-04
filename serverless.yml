@@ -1,4 +1,5 @@
 service: ternkonnect-backend
+useDotenv: true
 
 provider:
   name: aws
@@ -7,12 +8,12 @@ provider:
   stage: ${opt:stage, 'prod'}
   environment:
     NODE_ENV: ${env:NODE_ENV, 'production'}
-    DATABASE_URL: ${env:DATABASE_URL}
-    JWT_SECRET: ${env:JWT_SECRET}
-    AWS_S3_BUCKET_NAME: ${env:AWS_S3_BUCKET_NAME}
-    RESEND_API_KEY: ${env:RESEND_API_KEY}
-    FRONTEND_URL: ${env:FRONTEND_URL}
-    EMAIL_FROM: ${env:EMAIL_FROM}
+    DATABASE_URL: ${env:DATABASE_URL, ''}
+    JWT_SECRET: ${env:JWT_SECRET, ''}
+    AWS_S3_BUCKET_NAME: ${env:AWS_S3_BUCKET_NAME, ''}
+    RESEND_API_KEY: ${env:RESEND_API_KEY, ''}
+    FRONTEND_URL: ${env:FRONTEND_URL, ''}
+    EMAIL_FROM: ${env:EMAIL_FROM, ''}
 
   iam:
     role:
@@ -24,8 +25,16 @@ provider:
             - s3:DeleteObject
             - s3:ListBucket
           Resource:
-            - arn:aws:s3:::${env:AWS_S3_BUCKET_NAME}
-            - arn:aws:s3:::${env:AWS_S3_BUCKET_NAME}/*
+            - arn:aws:s3:::${env:AWS_S3_BUCKET_NAME, ''}
+            - arn:aws:s3:::${env:AWS_S3_BUCKET_NAME, ''}/*
+
+custom:
+  dotenv:
+    exclude:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_REGION
 
 functions:
   api:
