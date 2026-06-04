@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const region = process.env.AWS_REGION || "eu-north-1";
+const region = process.env.AWS_S3_REGION || process.env.AWS_REGION || "eu-north-1";
 const bucketName = process.env.AWS_S3_BUCKET || "ternkonnect-backend-media";
 
 // AWS SDK automatically uses AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars
