@@ -23,14 +23,10 @@
     "multer-storage-cloudinary": "^4.0.0",
     "pg": "^8.11.0",
     "pg-hstore": "^2.3.4",
-<<<<<<< HEAD
     "resend": "^6.12.4",
-    "sequelize": "^6.35.0"
-=======
     "sequelize": "^6.35.0",
     "serverless-dotenv-plugin": "^6.0.0",
     "serverless-http": "^4.0.0"
->>>>>>> 3cbf120b754673eecf8648e3a1e9fddde1ab95f4
   },
   "devDependencies": {
     "nodemon": "^3.0.0"
