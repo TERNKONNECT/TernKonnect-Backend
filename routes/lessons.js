@@ -1,22 +1,12 @@
 import express from "express";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import cloudinary from "../config/cloudinary.js";
 import Lesson from "../models/Lesson.js";
 import Module from "../models/Module.js";
 import { protect, adminOnly } from "../middleware/auth.js";
+import { uploadToS3, deleteFromS3 } from "../config/s3.js";
 
 const router = express.Router({ mergeParams: true });
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "lms/lessons",
-    resource_type: "video",
-    allowed_formats: ["mp4", "mkv", "webm", "mov"],
-  },
-});
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 // GET all lessons for a module
 router.get("/", async (req, res) => {
@@ -82,12 +72,14 @@ router.post(
       const { title, duration, order } = req.body;
       if (!title) return res.status(400).json({ error: "Title is required" });
 
+      const { url, key } = await uploadToS3(req.file, "lms/lessons");
+
       const lesson = await Lesson.create({
         moduleId: req.params.moduleId,
         title,
         type: "video",
-        videoUrl: req.file.path,
-        cloudinaryId: req.file.filename,
+        videoUrl: url,
+        cloudinaryId: key,
         duration,
         order,
       });
@@ -121,9 +113,7 @@ router.delete("/:id", protect, adminOnly, async (req, res) => {
     if (!lesson) return res.status(404).json({ error: "Lesson not found" });
 
     if (lesson.cloudinaryId) {
-      await cloudinary.uploader.destroy(lesson.cloudinaryId, {
-        resource_type: "video",
-      });
+      await deleteFromS3(lesson.cloudinaryId);
     }
 
     await lesson.destroy();

@@ -1,23 +1,12 @@
 import express from "express";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import cloudinary from "../config/cloudinary.js";
 import Video from "../models/Video.js";
 import Course from "../models/Course.js";
 import { protect, adminOnly } from "../middleware/auth.js";
+import { uploadToS3, deleteFromS3 } from "../config/s3.js";
 
 const router = express.Router({ mergeParams: true });
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "lms/videos",
-    resource_type: "video",
-    allowed_formats: ["mp4", "mkv", "webm", "mov"],
-  },
-});
-
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/", async (req, res) => {
   try {
@@ -90,6 +79,11 @@ router.post(
           .status(400)
           .json({ error: "Provide a video file or YouTube URL" });
 
+      let uploadResult = null;
+      if (req.file) {
+        uploadResult = await uploadToS3(req.file, "lms/videos");
+      }
+
       const video = await Video.create({
         courseId: req.params.courseId,
         title,
@@ -97,8 +91,8 @@ router.post(
         duration,
         difficulty,
         filename: req.file?.originalname || "",
-        url: req.file?.path || youtubeUrl,
-        cloudinaryId: req.file?.filename || "",
+        url: uploadResult ? uploadResult.url : youtubeUrl,
+        cloudinaryId: uploadResult ? uploadResult.key : "",
         youtubeUrl: youtubeUrl || "",
       });
       res.status(201).json(video);
@@ -130,9 +124,7 @@ router.delete("/:id", protect, adminOnly, async (req, res) => {
     if (!video) return res.status(404).json({ error: "Video not found" });
 
     if (video.cloudinaryId) {
-      await cloudinary.uploader.destroy(video.cloudinaryId, {
-        resource_type: "video",
-      });
+      await deleteFromS3(video.cloudinaryId);
     }
 
     await video.destroy();
