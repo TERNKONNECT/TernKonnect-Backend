@@ -1,25 +1,15 @@
 import express from "express";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import cloudinary from "../config/cloudinary.js";
 import Course from "../models/Course.js";
 import Module from "../models/Module.js";
 import Lesson from "../models/Lesson.js";
 import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
 import { protect, adminOnly } from "../middleware/auth.js";
+import { uploadToS3, deleteFromS3 } from "../config/s3.js";
 
 const router = express.Router();
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "lms/intro-videos",
-    resource_type: "video",
-    allowed_formats: ["mp4", "mkv", "webm", "mov"],
-  },
-});
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 // GET all courses
 router.get("/", async (req, res) => {
@@ -133,13 +123,12 @@ router.post(
       if (!req.file)
         return res.status(400).json({ error: "No video file uploaded" });
       if (course.introVideoCloudinaryId) {
-        await cloudinary.uploader.destroy(course.introVideoCloudinaryId, {
-          resource_type: "video",
-        });
+        await deleteFromS3(course.introVideoCloudinaryId);
       }
+      const { url, key } = await uploadToS3(req.file, "lms/intro-videos");
       await course.update({
-        introVideoUrl: req.file.path,
-        introVideoCloudinaryId: req.file.filename,
+        introVideoUrl: url,
+        introVideoCloudinaryId: key,
       });
       res.json(course);
     } catch (err) {
@@ -154,15 +143,7 @@ router.post(
   "/:id/thumbnail",
   protect,
   adminOnly,
-  multer({
-    storage: new CloudinaryStorage({
-      cloudinary,
-      params: {
-        folder: "lms/thumbnails",
-        allowed_formats: ["jpg", "jpeg", "png", "webp"],
-      },
-    }),
-  }).single("thumbnail"),
+  upload.single("thumbnail"),
   async (req, res) => {
     try {
       const course = await Course.findByPk(req.params.id);
@@ -173,12 +154,14 @@ router.post(
         return res.status(400).json({ error: "No image uploaded" });
 
       if (course.thumbnailCloudinaryId) {
-        await cloudinary.uploader.destroy(course.thumbnailCloudinaryId);
+        await deleteFromS3(course.thumbnailCloudinaryId);
       }
 
+      const { url, key } = await uploadToS3(req.file, "lms/thumbnails");
+
       await course.update({
-        thumbnail: req.file.path,
-        thumbnailCloudinaryId: req.file.filename,
+        thumbnail: url,
+        thumbnailCloudinaryId: key,
       });
       res.json(course);
     } catch (err) {
@@ -213,9 +196,10 @@ router.delete("/:id", protect, adminOnly, async (req, res) => {
         .status(403)
         .json({ error: "Not authorized to delete this course" });
     if (course.introVideoCloudinaryId) {
-      await cloudinary.uploader.destroy(course.introVideoCloudinaryId, {
-        resource_type: "video",
-      });
+      await deleteFromS3(course.introVideoCloudinaryId);
+    }
+    if (course.thumbnailCloudinaryId) {
+      await deleteFromS3(course.thumbnailCloudinaryId);
     }
     await course.destroy();
     res.json({ message: "Course deleted" });
