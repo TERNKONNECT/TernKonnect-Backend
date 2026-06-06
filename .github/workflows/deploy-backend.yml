@@ -45,7 +45,7 @@ jobs:
       - name: Sync Database Schema
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: node scripts/sync-db.js
+        run: npm run db:sync
 
       - name: Serverless Deploy
         env:
