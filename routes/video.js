@@ -3,7 +3,7 @@ import multer from "multer";
 import Video from "../models/Video.js";
 import Course from "../models/Course.js";
 import { protect, adminOnly } from "../middleware/auth.js";
-import { uploadToS3, deleteFromS3 } from "../config/s3.js";
+import { uploadFile, deleteFile } from "../config/storage.js";
 
 const router = express.Router({ mergeParams: true });
 const upload = multer({ storage: multer.memoryStorage() });
@@ -32,36 +32,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// router.post(
-//   "/",
-//   protect,
-//   adminOnly,
-//   upload.single("video"),
-//   async (req, res) => {
-//     try {
-//       const course = await Course.findByPk(req.params.courseId);
-//       if (!course) return res.status(404).json({ error: "Course not found" });
-//       if (!req.file)
-//         return res.status(400).json({ error: "No video file uploaded" });
-
-//       const { title, description, duration, difficulty } = req.body;
-//       const video = await Video.create({
-//         courseId: req.params.courseId,
-//         title,
-//         description,
-//         filename: req.file.originalname,
-//         url: req.file.path,
-//         cloudinaryId: req.file.filename,
-//         duration,
-//         difficulty,
-//       });
-//       res.status(201).json(video);
-//     } catch (err) {
-//       res.status(500).json({ error: err.message });
-//     }
-//   },
-// );
-
 router.post(
   "/",
   protect,
@@ -79,11 +49,7 @@ router.post(
           .status(400)
           .json({ error: "Provide a video file or YouTube URL" });
 
-      let uploadResult = null;
-      if (req.file) {
-        uploadResult = await uploadToS3(req.file, "lms/videos");
-      }
-
+      const fileData = req.file ? await uploadFile(req.file, "lms/videos") : null;
       const video = await Video.create({
         courseId: req.params.courseId,
         title,
@@ -91,8 +57,8 @@ router.post(
         duration,
         difficulty,
         filename: req.file?.originalname || "",
-        url: uploadResult ? uploadResult.url : youtubeUrl,
-        cloudinaryId: uploadResult ? uploadResult.key : "",
+        url: fileData?.url || youtubeUrl,
+        cloudinaryId: fileData?.id || "",
         youtubeUrl: youtubeUrl || "",
       });
       res.status(201).json(video);
@@ -124,7 +90,7 @@ router.delete("/:id", protect, adminOnly, async (req, res) => {
     if (!video) return res.status(404).json({ error: "Video not found" });
 
     if (video.cloudinaryId) {
-      await deleteFromS3(video.cloudinaryId);
+      await deleteFile(video.cloudinaryId, "video");
     }
 
     await video.destroy();

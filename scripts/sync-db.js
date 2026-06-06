@@ -9,24 +9,23 @@ import Enrollment from "../models/Enrollment.js";
 import LessonProgress from "../models/LessonProgress.js";
 import TrialSignup from "../models/TrialSignup.js";
 import Video from "../models/Video.js";
+import "../models/Payment.js";
+import "../models/Review.js";
 
 // Ensure associations are initialized before syncing
 setupCourseAssociations(User);
 
-async function syncDB() {
+async function runSync() {
   try {
-    console.log("Connecting to the database for schema sync...");
-    await sequelize.authenticate();
-    console.log("Database connection established.");
-
-    // Sync all model definitions dynamically
+    console.log("Starting database sync...");
+    await connectDB();
     await sequelize.sync({ alter: true });
-    console.log("Database schema synced successfully!");
+    console.log("Database schema synced successfully via CI/CD!");
     process.exit(0);
   } catch (error) {
-    console.error("Database sync failed:", error);
+    console.error("Failed to sync database schema:", error);
     process.exit(1);
   }
 }
 
-syncDB();
+runSync();
