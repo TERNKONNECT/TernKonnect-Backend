@@ -18,7 +18,8 @@ setupCourseAssociations(User);
 async function runSync() {
   try {
     console.log("Starting database sync...");
-    await connectDB();
+    await sequelize.authenticate();
+    console.log("Database connection established.");
     await sequelize.sync({ alter: true });
     console.log("Database schema synced successfully via CI/CD!");
     process.exit(0);
