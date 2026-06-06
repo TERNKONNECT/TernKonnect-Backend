@@ -59,8 +59,8 @@ router.get("/:courseId", async (req, res) => {
     const avgRating =
       reviews.length > 0
         ? Math.round(
-            (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) * 10,
-          ) / 10
+          (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) * 10,
+        ) / 10
         : 0;
 
     res.json({ avgRating, totalReviews: reviews.length, reviews });
@@ -87,8 +87,8 @@ router.get("/:courseId/admin", protect, adminOnly, async (req, res) => {
     const avgRating =
       reviews.length > 0
         ? Math.round(
-            (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) * 10,
-          ) / 10
+          (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) * 10,
+        ) / 10
         : 0;
 
     res.json({ avgRating, totalReviews: reviews.length, reviews });

@@ -5,11 +5,63 @@ import Module from "../models/Module.js";
 import Lesson from "../models/Lesson.js";
 import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
+import Enrollment from "../models/Enrollment.js";
 import { protect, adminOnly } from "../middleware/auth.js";
-import { uploadToS3, deleteFromS3 } from "../config/s3.js";
+import {
+  createUploadUrl,
+  uploadFile,
+  deleteFile,
+  getFileUrl,
+} from "../config/storage.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+async function serializeCourse(course) {
+  const data = course.toJSON ? course.toJSON() : course;
+  return {
+    ...data,
+    thumbnail: await getFileUrl(data.thumbnailCloudinaryId, data.thumbnail),
+    introVideoUrl: await getFileUrl(
+      data.introVideoCloudinaryId,
+      data.introVideoUrl,
+    ),
+  };
+}
+
+async function serializeLesson(lesson) {
+  const data = lesson.toJSON ? lesson.toJSON() : lesson;
+  return {
+    ...data,
+    videoUrl:
+      data.type === "video"
+        ? await getFileUrl(data.cloudinaryId, data.videoUrl)
+        : data.videoUrl,
+  };
+}
+
+async function getTokenUser(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return null;
+  try {
+    const jwt = await import("jsonwebtoken");
+    return jwt.default.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+
+async function hasCourseAccess(req, course) {
+  const user = await getTokenUser(req);
+  if (!user) return false;
+  if (user.role === "super-admin") return true;
+  if (user.role === "admin" && course.createdBy === user.id) return true;
+  return Boolean(
+    await Enrollment.findOne({
+      where: { userId: user.id, courseId: course.id },
+    }),
+  );
+}
 
 // GET all courses
 router.get("/", async (req, res) => {
@@ -39,20 +91,25 @@ router.get("/", async (req, res) => {
 
     const courses = await Course.findAll({
       where,
-      // Include instructor name only for super-admin
-      include: isSuperAdmin
-        ? [
-            {
-              model: User,
-              as: "instructor",
-              attributes: ["id", "name", "email"],
-            },
-          ]
-        : [],
+      include: [
+        {
+          model: User,
+          as: "instructor",
+          attributes: [
+            "id",
+            "name",
+            "email",
+            "title",
+            "bio",
+            "avatar",
+            "avatarCloudinaryId",
+          ],
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
 
-    res.json(courses);
+    res.json(await Promise.all(courses.map(serializeCourse)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -63,6 +120,8 @@ router.get("/:id", async (req, res) => {
   try {
     const course = await Course.findByPk(req.params.id);
     if (!course) return res.status(404).json({ error: "Course not found" });
+
+    const canAccessContent = await hasCourseAccess(req, course);
 
     const modules = await Module.findAll({
       where: { courseId: req.params.id },
@@ -78,11 +137,30 @@ router.get("/:id", async (req, res) => {
           }),
           Quiz.findOne({ where: { moduleId: mod.id } }),
         ]);
-        return { ...mod.toJSON(), lessons, quiz };
+        return {
+          ...mod.toJSON(),
+          lessons: await Promise.all(
+            lessons.map(async (lesson) => {
+              const serialized = await serializeLesson(lesson);
+              if (canAccessContent) return serialized;
+              return {
+                ...serialized,
+                content: "",
+                videoUrl: "",
+                locked: true,
+              };
+            }),
+          ),
+          quiz,
+        };
       }),
     );
 
-    res.json({ ...course.toJSON(), modules: modulesWithContent });
+    res.json({
+      ...(await serializeCourse(course)),
+      modules: modulesWithContent,
+      hasAccess: canAccessContent,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -91,13 +169,21 @@ router.get("/:id", async (req, res) => {
 // POST create course
 router.post("/", protect, adminOnly, async (req, res) => {
   try {
-    const { title, description, difficulty, status } = req.body;
+    const { title, description, difficulty, status, pricingType, price } = req.body;
     if (!title) return res.status(400).json({ error: "Title is required" });
+    const normalizedPricingType = pricingType === "paid" ? "paid" : "free";
+    const normalizedPrice =
+      normalizedPricingType === "paid"
+        ? Math.max(1, Math.round(Number(price || 0)))
+        : 0;
     const course = await Course.create({
       title,
       description,
       difficulty,
       status,
+      pricingType: normalizedPricingType,
+      price: normalizedPrice,
+      currency: "NGN",
       createdBy: req.user.id,
     });
     res.status(201).json(course);
@@ -107,6 +193,48 @@ router.post("/", protect, adminOnly, async (req, res) => {
 });
 
 // POST upload intro video
+router.post("/:id/intro-video-upload-url", protect, adminOnly, async (req, res) => {
+  try {
+    const course = await Course.findByPk(req.params.id, {
+      include: [
+        {
+          model: User,
+          as: "instructor",
+          attributes: [
+            "id",
+            "name",
+            "email",
+            "title",
+            "bio",
+            "avatar",
+            "avatarCloudinaryId",
+          ],
+        },
+      ],
+    });
+    if (!course) return res.status(404).json({ error: "Course not found" });
+    const canAccessContent = await hasCourseAccess(req, course);
+    if (req.user.role === "admin" && course.createdBy !== req.user.id)
+      return res
+        .status(403)
+        .json({ error: "Not authorized to update this course" });
+
+    const { filename, contentType } = req.body;
+    if (!filename)
+      return res.status(400).json({ error: "Filename is required" });
+
+    const upload = await createUploadUrl({
+      filename,
+      contentType,
+      folder: "lms/intro-videos",
+    });
+
+    res.json(upload);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post(
   "/:id/intro-video",
   protect,
@@ -122,13 +250,15 @@ router.post(
           .json({ error: "Not authorized to update this course" });
       if (!req.file)
         return res.status(400).json({ error: "No video file uploaded" });
+
       if (course.introVideoCloudinaryId) {
-        await deleteFromS3(course.introVideoCloudinaryId);
+        await deleteFile(course.introVideoCloudinaryId, "video");
       }
-      const { url, key } = await uploadToS3(req.file, "lms/intro-videos");
+
+      const fileData = await uploadFile(req.file, "lms/intro-videos");
       await course.update({
-        introVideoUrl: url,
-        introVideoCloudinaryId: key,
+        introVideoUrl: fileData.url,
+        introVideoCloudinaryId: fileData.id,
       });
       res.json(course);
     } catch (err) {
@@ -154,14 +284,13 @@ router.post(
         return res.status(400).json({ error: "No image uploaded" });
 
       if (course.thumbnailCloudinaryId) {
-        await deleteFromS3(course.thumbnailCloudinaryId);
+        await deleteFile(course.thumbnailCloudinaryId, "image");
       }
 
-      const { url, key } = await uploadToS3(req.file, "lms/thumbnails");
-
+      const fileData = await uploadFile(req.file, "lms/thumbnails");
       await course.update({
-        thumbnail: url,
-        thumbnailCloudinaryId: key,
+        thumbnail: fileData.url,
+        thumbnailCloudinaryId: fileData.id,
       });
       res.json(course);
     } catch (err) {
@@ -179,7 +308,13 @@ router.put("/:id", protect, adminOnly, async (req, res) => {
       return res
         .status(403)
         .json({ error: "Not authorized to update this course" });
-    await course.update(req.body);
+    const updates = { ...req.body };
+    if (updates.pricingType === "free") updates.price = 0;
+    if (updates.pricingType === "paid") {
+      updates.price = Math.max(1, Math.round(Number(updates.price || course.price || 0)));
+      updates.currency = "NGN";
+    }
+    await course.update(updates);
     res.json(course);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -196,10 +331,10 @@ router.delete("/:id", protect, adminOnly, async (req, res) => {
         .status(403)
         .json({ error: "Not authorized to delete this course" });
     if (course.introVideoCloudinaryId) {
-      await deleteFromS3(course.introVideoCloudinaryId);
+      await deleteFile(course.introVideoCloudinaryId, "video");
     }
     if (course.thumbnailCloudinaryId) {
-      await deleteFromS3(course.thumbnailCloudinaryId);
+      await deleteFile(course.thumbnailCloudinaryId, "image");
     }
     await course.destroy();
     res.json({ message: "Course deleted" });

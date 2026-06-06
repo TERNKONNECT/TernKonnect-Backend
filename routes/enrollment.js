@@ -18,6 +18,11 @@ router.post("/:courseId", protect, async (req, res) => {
   try {
     const course = await Course.findByPk(req.params.courseId);
     if (!course) return res.status(404).json({ error: "Course not found" });
+    if (course.pricingType === "paid" && Number(course.price) > 0) {
+      return res.status(402).json({
+        error: "Payment is required before enrolling in this course",
+      });
+    }
 
     const [enrollment, created] = await Enrollment.findOrCreate({
       where: { userId: req.user.id, courseId: req.params.courseId },
@@ -47,9 +52,10 @@ router.get("/my", protect, async (req, res) => {
             { model: Module, where: { courseId: e.courseId }, required: true },
           ],
         });
-        const completedLessons = await LessonProgress.count({
+        const completedLessonRows = await LessonProgress.findAll({
           where: { enrollmentId: e.id },
         });
+        const completedLessons = completedLessonRows.length;
         const progressPct =
           totalLessons > 0
             ? Math.round((completedLessons / totalLessons) * 100)
@@ -63,6 +69,7 @@ router.get("/my", protect, async (req, res) => {
           course: e.Course,
           totalLessons,
           completedLessons,
+          completedLessonIds: completedLessonRows.map((progress) => progress.lessonId),
           progressPct,
         };
       }),
@@ -174,10 +181,15 @@ router.get("/:courseId/progress", protect, async (req, res) => {
 // GET /api/enrollments/admin/all — all enrollments across all courses
 router.get("/admin/all", protect, adminOnly, async (req, res) => {
   try {
+    const courseWhere = req.user.role === "admin" ? { createdBy: req.user.id } : {};
     const enrollments = await Enrollment.findAll({
       include: [
         { model: User, attributes: ["id", "name", "email"] },
-        { model: Course, attributes: ["id", "title", "difficulty", "status"] },
+        {
+          model: Course,
+          attributes: ["id", "title", "difficulty", "status", "createdBy"],
+          where: courseWhere,
+        },
       ],
       order: [["createdAt", "DESC"]],
     });
@@ -220,6 +232,8 @@ router.get("/admin/courses/:courseId", protect, adminOnly, async (req, res) => {
   try {
     const course = await Course.findByPk(req.params.courseId);
     if (!course) return res.status(404).json({ error: "Course not found" });
+    if (req.user.role === "admin" && course.createdBy !== req.user.id)
+      return res.status(403).json({ error: "Not authorized" });
 
     const enrollments = await Enrollment.findAll({
       where: { courseId: req.params.courseId },
@@ -322,12 +336,41 @@ router.get("/admin/users/:userId", protect, adminOnly, async (req, res) => {
 // GET /api/enrollments/admin/stats — overall platform statistics
 router.get("/admin/stats", protect, adminOnly, async (req, res) => {
   try {
+    const courseWhere = req.user.role === "admin" ? { createdBy: req.user.id } : {};
+    const courses = await Course.findAll({
+      where: courseWhere,
+      attributes: ["id"],
+    });
+    const courseIds = courses.map((course) => course.id);
+    const enrollmentWhere =
+      req.user.role === "admin" ? { courseId: courseIds } : {};
     const [totalUsers, totalCourses, totalEnrollments, totalCompleted] =
       await Promise.all([
-        User.count({ where: { role: "user" } }),
-        Course.count(),
-        Enrollment.count(),
-        Enrollment.count({ where: { isCompleted: true } }),
+        req.user.role === "admin" && courseIds.length === 0
+          ? 0
+          : User.count({
+              where: { role: "user" },
+              include:
+                req.user.role === "admin"
+                  ? [
+                      {
+                        model: Enrollment,
+                        where: { courseId: courseIds },
+                        required: true,
+                      },
+                    ]
+                  : [],
+              distinct: true,
+            }),
+        Course.count({ where: courseWhere }),
+        courseIds.length === 0 && req.user.role === "admin"
+          ? 0
+          : Enrollment.count({ where: enrollmentWhere }),
+        courseIds.length === 0 && req.user.role === "admin"
+          ? 0
+          : Enrollment.count({
+              where: { ...enrollmentWhere, isCompleted: true },
+            }),
       ]);
 
     // Top 5 most enrolled courses
@@ -339,7 +382,7 @@ router.get("/admin/stats", protect, adminOnly, async (req, res) => {
           "enrollmentCount",
         ],
       ],
-      include: [{ model: Course, attributes: ["id", "title"] }],
+      include: [{ model: Course, attributes: ["id", "title"], where: courseWhere }],
       group: ["courseId", "Course.id", "Course.title"],
       order: [[sequelize.fn("COUNT", sequelize.col("Enrollment.id")), "DESC"]],
       limit: 5,
