@@ -25,6 +25,13 @@ const Course = sequelize.define(
       type: DataTypes.ENUM("draft", "published"),
       defaultValue: "draft",
     },
+    pricingType: {
+      type: DataTypes.ENUM("free", "paid"),
+      allowNull: false,
+      defaultValue: "free",
+    },
+    price: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    currency: { type: DataTypes.STRING, allowNull: false, defaultValue: "NGN" },
     whatYouLearn: { type: DataTypes.JSONB, defaultValue: [] },
   },
   { tableName: "courses", timestamps: true },
