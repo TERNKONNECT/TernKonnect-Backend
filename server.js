@@ -16,7 +16,7 @@ import superAdminRoutes from "./routes/superadmin.js";
 import profileRoutes from "./routes/profile.js";
 import reviewRoutes from "./routes/reviews.js";
 import "./models/Payment.js";
-import paymentRoutes from "./routes/Payment.js";
+import paymentRoutes from "./routes/payment.js";
 
 setupCourseAssociations(User);
 const dbReady = connectDB();
