@@ -128,6 +128,58 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// Public instructor registration
+router.post("/register-instructor", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password)
+      return res.status(400).json({ error: "All fields are required" });
+    const normalizedEmail = normalizeEmail(email);
+    const exists = await User.findOne({ where: { email: normalizedEmail } });
+    if (exists) {
+      if (exists.role === "admin" && !exists.emailVerified) {
+        exists.name = name;
+        exists.password = password;
+        exists.adminInviteToken = null;
+        exists.adminInviteExpires = null;
+        exists.passwordSetupRequired = false;
+        const verification = await sendVerificationEmail(exists);
+        return res.status(200).json({
+          message: verification.skipped
+            ? "Account updated. Verification email could not be sent in Resend testing mode. Use the verification link from the server logs."
+            : "Account updated. Verification email resent. Check your inbox.",
+          verificationLink:
+            verification.skipped && process.env.NODE_ENV !== "production"
+              ? verification.link
+              : undefined,
+        });
+      }
+      return res.status(400).json({ error: "Email already in use" });
+    }
+    const user = await User.create({
+      name,
+      email: normalizedEmail,
+      password,
+      role: "admin", // Instructors are stored as admins
+      emailVerified: false,
+      adminInviteToken: null,
+      adminInviteExpires: null,
+      passwordSetupRequired: false,
+    });
+    const verification = await sendVerificationEmail(user);
+    res.status(201).json({
+      message: verification.skipped
+        ? "Account created. Verification email could not be sent in Resend testing mode. Use the verification link from the server logs."
+        : "Account created. Check your email to verify your account.",
+      verificationLink:
+        verification.skipped && process.env.NODE_ENV !== "production"
+          ? verification.link
+          : undefined,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get("/verify-email", async (req, res) => {
   try {
     const { token, email } = req.query;
