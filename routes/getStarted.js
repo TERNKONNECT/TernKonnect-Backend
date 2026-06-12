@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import TrialSignup from "../models/TrialSignup.js";
 
 const router = express.Router();
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_to_prevent_crash');
 
 function generateAccountCode(email, id) {
   const raw = `${email}-${id}`;
