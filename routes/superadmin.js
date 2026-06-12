@@ -14,7 +14,7 @@ import {
   appUrl,
   sendEmail,
 } from "../config/email.js";
-import { protect, adminOnly, superAdminOnly } from "../middleware/auth.js";
+import { protect, adminOnly, superAdminOnly, strictAdminOnly } from "../middleware/auth.js";
 import { Op } from "sequelize";
 
 const router = express.Router();
@@ -121,10 +121,10 @@ function serializeAdminUser(user, enrolledCourses = []) {
 }
 
 // GET /api/superadmin/instructors — all admins with their course counts
-router.get("/instructors", protect, superAdminOnly, async (req, res) => {
+router.get("/instructors", protect, strictAdminOnly, async (req, res) => {
   try {
     const instructors = await User.findAll({
-      where: { role: "admin" },
+      where: { role: ["admin", "operator"] },
       attributes: [
         "id",
         "name",
@@ -183,16 +183,18 @@ router.get("/instructors", protect, superAdminOnly, async (req, res) => {
 
 // GET /api/superadmin/instructors/:id — one instructor's full details + courses
 // POST /api/superadmin/instructors/invite - invite a new admin by email
-router.post("/instructors/invite", protect, superAdminOnly, async (req, res) => {
+router.post("/instructors/invite", protect, strictAdminOnly, async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email, role } = req.body;
     if (!name || !email)
       return res.status(400).json({ error: "Name and email are required" });
+
+    const inviteRole = role === "operator" ? "operator" : "admin";
 
     const normalizedEmail = normalizeEmail(email);
     const existing = await User.findOne({ where: { email: normalizedEmail } });
 
-    if (existing && existing.role !== "admin") {
+    if (existing && existing.role !== "admin" && existing.role !== "operator" && existing.role !== "user") {
       return res.status(400).json({
         error: "This email already belongs to another account.",
       });
@@ -213,12 +215,13 @@ router.post("/instructors/invite", protect, superAdminOnly, async (req, res) => 
         name: String(name).trim(),
         email: normalizedEmail,
         password: temporaryPassword,
-        role: "admin",
+        role: inviteRole,
         emailVerified: true,
         passwordSetupRequired: true,
       }));
 
     admin.name = String(name).trim();
+    admin.role = inviteRole;
     admin.adminInviteToken = hashValue(token);
     admin.adminInviteExpires = tokenExpiry(7);
     admin.passwordSetupRequired = true;
@@ -261,10 +264,10 @@ router.post("/instructors/invite", protect, superAdminOnly, async (req, res) => 
   }
 });
 
-router.get("/instructors/:id", protect, superAdminOnly, async (req, res) => {
+router.get("/instructors/:id", protect, strictAdminOnly, async (req, res) => {
   try {
     const instructor = await User.findOne({
-      where: { id: req.params.id, role: "admin" },
+      where: { id: req.params.id, role: ["admin", "operator"] },
       attributes: ["id", "name", "email", "createdAt"],
     });
     if (!instructor)

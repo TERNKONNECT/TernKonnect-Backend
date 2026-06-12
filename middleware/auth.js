@@ -12,6 +12,12 @@ export function protect(req, res, next) {
 }
 
 export function adminOnly(req, res, next) {
+  if (req.user?.role !== "admin" && req.user?.role !== "super-admin" && req.user?.role !== "operator")
+    return res.status(403).json({ error: "Admins or operators only" });
+  next();
+}
+
+export function strictAdminOnly(req, res, next) {
   if (req.user?.role !== "admin" && req.user?.role !== "super-admin")
     return res.status(403).json({ error: "Admins only" });
   next();
