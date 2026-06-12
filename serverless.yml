@@ -14,6 +14,7 @@ provider:
     RESEND_API_KEY: ${env:RESEND_API_KEY, ''}
     FRONTEND_URL: ${env:FRONTEND_URL, ''}
     EMAIL_FROM: ${env:EMAIL_FROM, ''}
+    PAYSTACK_SECRET_KEY: ${env:PAYSTACK_SECRET_KEY, ''}
 
   iam:
     role:
