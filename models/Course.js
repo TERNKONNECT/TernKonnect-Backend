@@ -20,6 +20,10 @@ const Course = sequelize.define(
     thumbnailCloudinaryId: { type: DataTypes.STRING, defaultValue: "" },
     introVideoUrl: { type: DataTypes.STRING, defaultValue: "" },
     introVideoCloudinaryId: { type: DataTypes.STRING, defaultValue: "" },
+    targetAudience: { 
+      type: DataTypes.ENUM("learner", "educator", "both"), 
+      defaultValue: "both" 
+    },
     difficulty: { type: DataTypes.STRING, defaultValue: "Beginner" },
     status: {
       type: DataTypes.ENUM("draft", "published"),

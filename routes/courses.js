@@ -69,6 +69,7 @@ router.get("/", async (req, res) => {
     const authHeader = req.headers.authorization;
     let where = {};
     let isSuperAdmin = false;
+    const { targetAudience } = req.query;
 
     if (authHeader) {
       try {
@@ -87,6 +88,13 @@ router.get("/", async (req, res) => {
       }
     } else {
       where = { status: "published" };
+    }
+
+    if (targetAudience && targetAudience !== "all") {
+      const { Op } = await import("sequelize");
+      where.targetAudience = {
+        [Op.in]: [targetAudience, "both"],
+      };
     }
 
     const courses = await Course.findAll({
@@ -169,7 +177,7 @@ router.get("/:id", async (req, res) => {
 // POST create course
 router.post("/", protect, adminOnly, async (req, res) => {
   try {
-    const { title, description, difficulty, status, pricingType, price } = req.body;
+    const { title, description, difficulty, status, pricingType, price, targetAudience } = req.body;
     if (!title) return res.status(400).json({ error: "Title is required" });
     const normalizedPricingType = pricingType === "paid" ? "paid" : "free";
     const normalizedPrice =
@@ -184,6 +192,7 @@ router.post("/", protect, adminOnly, async (req, res) => {
       pricingType: normalizedPricingType,
       price: normalizedPrice,
       currency: "NGN",
+      targetAudience: targetAudience || "both",
       createdBy: req.user.id,
     });
     res.status(201).json(course);
@@ -309,6 +318,9 @@ router.put("/:id", protect, adminOnly, async (req, res) => {
         .status(403)
         .json({ error: "Not authorized to update this course" });
     const updates = { ...req.body };
+    if (updates.targetAudience === undefined) {
+      delete updates.targetAudience;
+    }
     if (updates.pricingType === "free") updates.price = 0;
     if (updates.pricingType === "paid") {
       updates.price = Math.max(1, Math.round(Number(updates.price || course.price || 0)));
