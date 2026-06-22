@@ -9,7 +9,7 @@
     "dev": "nodemon --require dotenv/config server.js",
     "start": "node server.js",
     "db:sync": "node --import dotenv/config scripts/sync-db.js",
-    "build": "echo 'No build step needed'"
+    "build": "npm run db:sync"
   },
   "dependencies": {
     "aws-sdk": "^2.1500.0",

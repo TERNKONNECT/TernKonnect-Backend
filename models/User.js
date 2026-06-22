@@ -17,6 +17,10 @@ const User = sequelize.define(
       type: DataTypes.ENUM("user", "admin", "super-admin", "operator"),
       defaultValue: "user",
     },
+    userType: {
+      type: DataTypes.ENUM("learner", "educator"),
+      defaultValue: "learner",
+    },
     emailVerified: { type: DataTypes.BOOLEAN, defaultValue: false },
     emailVerificationToken: { type: DataTypes.STRING, allowNull: true },
     emailVerificationExpires: { type: DataTypes.DATE, allowNull: true },

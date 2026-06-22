@@ -22,6 +22,7 @@ const userPayload = (user) => ({
   name: user.name,
   email: user.email,
   role: user.role,
+  userType: user.userType,
   isBlocked: false,
   enrolledCourses: [],
   quizScores: [],
@@ -78,7 +79,7 @@ function hasValidAdminInvite(user, token) {
 // Public user registration
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, userType } = req.body;
     if (!name || !email || !password)
       return res.status(400).json({ error: "All fields are required" });
     const normalizedEmail = normalizeEmail(email);
@@ -108,6 +109,7 @@ router.post("/register", async (req, res) => {
       email: normalizedEmail,
       password,
       role: "user",
+      userType: userType === "educator" ? "educator" : "learner",
       emailVerified: false,
       adminInviteToken: null,
       adminInviteExpires: null,
