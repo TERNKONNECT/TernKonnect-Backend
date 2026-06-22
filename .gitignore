@@ -8,6 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+scripts/create-admin.js
+scripts/update-password.js
 dist
 dist-ssr
 *.local
@@ -22,7 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-scripts
 
 # Terraform
 .terraform/
@@ -35,4 +36,3 @@ scripts
 
 
 .serverless
-scripts/
