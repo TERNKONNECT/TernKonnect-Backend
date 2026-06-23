@@ -234,7 +234,7 @@ router.post("/instructors/invite", protect, strictAdminOnly, async (req, res) =>
 
     await sendEmail({
       to: admin.email,
-      subject: "You have been invited to become a DWS Academy admin",
+      subject: "You have been invited to become a TernKonnect Academy admin",
       html: adminInviteEmailTemplate({
         name: admin.name,
         inviterName: inviter?.name || "A super admin",

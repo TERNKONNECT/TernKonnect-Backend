@@ -43,7 +43,7 @@ async function sendVerificationEmail(user) {
   const link = appUrl(`/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`);
   const emailResult = await sendEmail({
     to: user.email,
-    subject: "Verify your DWS Academy account",
+    subject: "Verify your TernKonnect Academy account",
     html: verificationEmailTemplate({ name: user.name, link }),
   });
 
@@ -60,7 +60,7 @@ async function sendVerificationEmail(user) {
 async function sendPasswordResetEmail(user, otp) {
   await sendEmail({
     to: user.email,
-    subject: "Your DWS Academy password reset code",
+    subject: "Your TernKonnect Academy password reset code",
     html: passwordResetEmailTemplate({ name: user.name, otp }),
   });
 }

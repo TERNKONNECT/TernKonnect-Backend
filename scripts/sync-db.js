@@ -23,27 +23,7 @@ async function runSync() {
     await sequelize.sync({ alter: true });
     console.log("Database schema synced successfully via CI/CD!");
 
-    // Create Super Admin user
-    console.log("Checking for super admin user...");
-    const [admin, created] = await User.findOrCreate({
-      where: { email: "superadmin@gmail.com" },
-      defaults: {
-        name: "Super Admin",
-        password: "SUPERadmin!@2026",
-        role: "super-admin",
-        emailVerified: true
-      }
-    });
 
-    if (created) {
-      console.log("Super admin user created successfully.");
-    } else {
-      console.log("Super admin user already exists. Updating password...");
-      admin.password = "SUPERadmin!@2026";
-      admin.role = "super-admin";
-      await admin.save();
-      console.log("Super admin user updated.");
-    }
 
     process.exit(0);
   } catch (error) {

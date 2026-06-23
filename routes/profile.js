@@ -86,7 +86,7 @@ router.post(
   },
 );
 
-// GET /api/profile/:adminId — public profile of an instructor (for DWSAcademy -ui)
+// GET /api/profile/:adminId — public profile of an instructor (for TernKonnect-ui)
 router.get("/:adminId", async (req, res) => {
   try {
     const user = await User.findOne({
