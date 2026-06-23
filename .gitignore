@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 scripts/create-admin.js
 scripts/update-password.js
+scripts/setup-superadmin.js
 dist
 dist-ssr
 *.local

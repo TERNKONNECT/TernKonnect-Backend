@@ -111,16 +111,16 @@ function emailLayout({
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
                     <td>
-                      <div style="display:inline-block;width:44px;height:44px;border-radius:12px;background:#facc15;text-align:center;line-height:44px;font-weight:800;font-size:18px;color:#111111;">D</div>
+                      <div style="font-size:22px;font-weight:800;color:#5c67ff;letter-spacing:0.02em;">TERNKONNECT</div>
                     </td>
-                    <td align="right" style="font-size:14px;font-weight:700;color:#facc15;letter-spacing:0.02em;">${BRAND_NAME}</td>
+                    <td align="right" style="font-size:14px;font-weight:700;color:#5c67ff;letter-spacing:0.02em;">${BRAND_NAME}</td>
                   </tr>
                 </table>
               </td>
             </tr>
             <tr>
               <td style="padding:34px 32px 12px;">
-                <p style="margin:0 0 12px;font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#ca8a04;">${escapeHtml(eyebrow)}</p>
+                <p style="margin:0 0 12px;font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#5c67ff;">${escapeHtml(eyebrow)}</p>
                 <h1 style="margin:0;font-size:28px;line-height:1.2;color:#111111;">${escapeHtml(title)}</h1>
               </td>
             </tr>
@@ -132,7 +132,7 @@ function emailLayout({
             ${action
             ? `<tr>
               <td style="padding:0 32px 28px;">
-                <a href="${action.href}" style="display:inline-block;background:#facc15;color:#111111;text-decoration:none;font-weight:800;font-size:15px;padding:14px 22px;border-radius:10px;">${escapeHtml(action.label)}</a>
+                <a href="${action.href}" style="display:inline-block;background:#5c67ff;color:#ffffff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 22px;border-radius:10px;">${escapeHtml(action.label)}</a>
               </td>
             </tr>`
             : ""

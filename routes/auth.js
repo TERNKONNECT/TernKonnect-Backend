@@ -43,7 +43,7 @@ async function sendVerificationEmail(user) {
   const link = appUrl(`/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`);
   const emailResult = await sendEmail({
     to: user.email,
-    subject: "Verify your DWS Academy account",
+    subject: "Verify your TernKonnect Academy account",
     html: verificationEmailTemplate({ name: user.name, link }),
   });
 
@@ -60,7 +60,7 @@ async function sendVerificationEmail(user) {
 async function sendPasswordResetEmail(user, otp) {
   await sendEmail({
     to: user.email,
-    subject: "Your DWS Academy password reset code",
+    subject: "Your TernKonnect Academy password reset code",
     html: passwordResetEmailTemplate({ name: user.name, otp }),
   });
 }
@@ -388,6 +388,33 @@ router.post("/reset-password", async (req, res) => {
     await user.save();
 
     res.json({ message: "Password reset successful. You can now log in." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Change password for authenticated user
+router.put("/password", protect, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Current and new password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "New password must be at least 6 characters" });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (!(await user.comparePassword(currentPassword))) {
+      return res.status(401).json({ error: "Incorrect current password" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password updated successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
