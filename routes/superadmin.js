@@ -221,7 +221,7 @@ router.post("/instructors/invite", protect, strictAdminOnly, async (req, res) =>
       }));
 
     admin.name = String(name).trim();
-    admin.role = inviteRole;
+    if (!existing) admin.role = inviteRole;
     admin.adminInviteToken = hashValue(token);
     admin.adminInviteExpires = tokenExpiry(7);
     admin.passwordSetupRequired = true;
