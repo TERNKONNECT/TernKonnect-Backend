@@ -111,7 +111,7 @@ function emailLayout({
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
                     <td>
-                      <div style="display:inline-block;width:44px;height:44px;border-radius:12px;background:#5c67ff;text-align:center;line-height:44px;font-weight:800;font-size:18px;color:#ffffff;">T</div>
+                      <div style="font-size:22px;font-weight:800;color:#5c67ff;letter-spacing:0.02em;">TERNKONNECT</div>
                     </td>
                     <td align="right" style="font-size:14px;font-weight:700;color:#5c67ff;letter-spacing:0.02em;">${BRAND_NAME}</td>
                   </tr>
