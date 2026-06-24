@@ -93,11 +93,20 @@ export const deleteFile = async (id, resourceType = "image") => {
 
 export const getFileUrl = async (id, fallbackUrl = "") => {
     if (!id) return fallbackUrl;
-    if (process.env.NODE_ENV !== "production" || !s3) return fallbackUrl;
 
-    return s3.getSignedUrlPromise("getObject", {
-        Bucket: process.env.AWS_S3_BUCKET_NAME,
-        Key: id,
-        Expires: 60 * 60,
-    });
+    // Decide by where the file actually lives, not by NODE_ENV — Cloudinary-hosted
+    // files (id = a Cloudinary public_id) must never be signed as if they were S3 keys.
+    const isS3Url = fallbackUrl && fallbackUrl.includes("amazonaws.com");
+    if (!isS3Url || !s3) return fallbackUrl;
+
+    try {
+        return await s3.getSignedUrlPromise("getObject", {
+            Bucket: process.env.AWS_S3_BUCKET_NAME,
+            Key: id,
+            Expires: 60 * 60,
+        });
+    } catch (err) {
+        console.error("Failed to sign S3 URL:", err);
+        return fallbackUrl;
+    }
 };
