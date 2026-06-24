@@ -54,8 +54,7 @@ async function getTokenUser(req) {
 async function hasCourseAccess(req, course) {
   const user = await getTokenUser(req);
   if (!user) return false;
-  if (user.role === "super-admin") return true;
-  if (user.role === "admin" && course.createdBy === user.id) return true;
+  if (["admin", "super-admin", "operator"].includes(user.role)) return true;
   return Boolean(
     await Enrollment.findOne({
       where: { userId: user.id, courseId: course.id },
