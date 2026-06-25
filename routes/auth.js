@@ -330,6 +330,10 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     if (user.isBlocked)
       return res.status(403).json({ error: "This account has been blocked." });
+    if (user.deactivatedAt)
+      return res.status(403).json({
+        error: "This account has been deactivated. Contact support to reactivate.",
+      });
     if (user.role === "admin" && user.passwordSetupRequired)
       return res.status(403).json({
         error: "Please accept your admin invitation and create a password first.",
@@ -415,6 +419,28 @@ router.put("/password", protect, async (req, res) => {
     await user.save();
 
     res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/deactivate — self-service account deactivation
+router.post("/deactivate", protect, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: "Password is required" });
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (!(await user.comparePassword(password))) {
+      return res.status(401).json({ error: "Incorrect password" });
+    }
+
+    user.deactivatedAt = new Date();
+    await user.save();
+
+    res.json({ message: "Account deactivated." });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
