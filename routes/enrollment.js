@@ -136,6 +136,36 @@ router.post(
   },
 );
 
+// POST /api/enrollments/:courseId/quiz-attempt — record a quiz attempt
+router.post("/:courseId/quiz-attempt", protect, async (req, res) => {
+  try {
+    const enrollment = await Enrollment.findOne({
+      where: { userId: req.user.id, courseId: req.params.courseId },
+    });
+    if (!enrollment)
+      return res.status(404).json({ error: "Not enrolled in this course" });
+
+    const { quizId, answers, score, totalQuestions } = req.body;
+    if (!quizId)
+      return res.status(400).json({ error: "quizId is required" });
+
+    const attempt = {
+      quizId,
+      answers: answers ?? {},
+      score: score ?? 0,
+      totalQuestions: totalQuestions ?? 0,
+      completedAt: new Date().toISOString(),
+    };
+
+    const existing = Array.isArray(enrollment.quizAttempts) ? enrollment.quizAttempts : [];
+    await enrollment.update({ quizAttempts: [...existing, attempt] });
+
+    res.json({ message: "Quiz attempt recorded", attempt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/enrollments/:courseId/progress — get logged-in user's progress on a course
 router.get("/:courseId/progress", protect, async (req, res) => {
   try {
@@ -170,6 +200,7 @@ router.get("/:courseId/progress", protect, async (req, res) => {
           ? Math.round((completedLessons.length / totalLessons) * 100)
           : 0,
       completedLessonIds: completedLessons.map((p) => p.lessonId),
+      quizAttempts: enrollment.quizAttempts ?? [],
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
