@@ -23,6 +23,7 @@ const Enrollment = sequelize.define(
     },
     isCompleted: { type: DataTypes.BOOLEAN, defaultValue: false },
     completedAt: { type: DataTypes.DATE, allowNull: true },
+    quizAttempts: { type: DataTypes.JSONB, defaultValue: [] },
   },
   {
     tableName: "enrollments",
