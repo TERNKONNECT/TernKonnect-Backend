@@ -22,6 +22,10 @@ const Lesson = sequelize.define(
     cloudinaryId: { type: DataTypes.STRING, defaultValue: "" },
     duration: { type: DataTypes.STRING, defaultValue: "" },
     order: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    documentUrl: { type: DataTypes.STRING, defaultValue: "" },
+    documentCloudinaryId: { type: DataTypes.STRING, defaultValue: "" },
+    transcriptUrl: { type: DataTypes.STRING, defaultValue: "" },
+    transcriptCloudinaryId: { type: DataTypes.STRING, defaultValue: "" },
   },
   { tableName: "lessons", timestamps: true },
 );
