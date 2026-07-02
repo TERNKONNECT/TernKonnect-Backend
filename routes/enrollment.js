@@ -433,7 +433,7 @@ router.post("/admin/enroll", protect, adminOnly, async (req, res) => {
     // Look up user by email
     const user = await User.findOne({ where: { email: email.trim().toLowerCase() } });
     if (!user) {
-      return res.status(404).json({ error: "No registered user found with that email" });
+      return res.status(404).json({ error: "User does not exist on the platform" });
     }
 
     // Validate course exists
