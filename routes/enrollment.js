@@ -421,6 +421,56 @@ router.get("/admin/users/:userId", protect, adminOnly, async (req, res) => {
   }
 });
 
+// POST /api/enrollments/admin/enroll — enroll a user by email (admin/super-admin only)
+router.post("/admin/enroll", protect, adminOnly, async (req, res) => {
+  try {
+    const { email, courseId } = req.body;
+
+    if (!email || !courseId) {
+      return res.status(400).json({ error: "email and courseId are required" });
+    }
+
+    // Look up user by email
+    const user = await User.findOne({ where: { email: email.trim().toLowerCase() } });
+    if (!user) {
+      return res.status(404).json({ error: "No registered user found with that email" });
+    }
+
+    // Validate course exists
+    const course = await Course.findByPk(courseId);
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    // Admin (instructor) can only enroll into their own courses
+    if (req.user.role === "admin" && course.createdBy !== req.user.id) {
+      return res.status(403).json({ error: "Not authorized to enroll users in this course" });
+    }
+
+    // Create enrollment (or detect duplicate)
+    const [enrollment, created] = await Enrollment.findOrCreate({
+      where: { userId: user.id, courseId },
+      defaults: { userId: user.id, courseId },
+    });
+
+    if (!created) {
+      return res.status(400).json({ error: "This user is already enrolled in this course" });
+    }
+
+    res.status(201).json({
+      message: "User enrolled successfully",
+      enrollment: {
+        enrollmentId: enrollment.id,
+        user: { id: user.id, name: user.name, email: user.email },
+        courseId,
+        enrolledAt: enrollment.createdAt,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/enrollments/admin/stats — overall platform statistics
 router.get("/admin/stats", protect, adminOnly, async (req, res) => {
   try {
