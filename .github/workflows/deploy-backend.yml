@@ -19,6 +19,8 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Run tests
+        run: npm test
 
       - name: Install Serverless Framework
         run: npm install -g serverless@3

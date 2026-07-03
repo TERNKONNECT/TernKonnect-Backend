@@ -9,7 +9,8 @@
     "dev": "nodemon --require dotenv/config server.js",
     "start": "node server.js",
     "db:sync": "node --import dotenv/config scripts/sync-db.js",
-    "build": "npm run db:sync"
+    "build": "npm run db:sync",
+    "test": "node --env-file=.env.test --test \"tests/**/*.test.js\""
   },
   "dependencies": {
     "aws-sdk": "^2.1500.0",
@@ -29,6 +30,7 @@
     "serverless-http": "^4.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0"
+    "nodemon": "^3.0.0",
+    "supertest": "^7.2.2"
   }
 }
