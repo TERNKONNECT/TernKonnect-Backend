@@ -2,11 +2,15 @@ import jwt from "jsonwebtoken";
 
 export function protect(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "No token provided" });
+  if (!token || token === "null" || token === "undefined")
+    return res.status(401).json({ error: "No token provided" });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
-  } catch {
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Token expired, please log in again" });
+    }
     res.status(401).json({ error: "Invalid token" });
   }
 }

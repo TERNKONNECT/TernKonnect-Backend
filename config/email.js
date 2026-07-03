@@ -295,3 +295,32 @@ export function paymentInvoiceEmailTemplate({
             "This receipt confirms successful payment and lifetime access to the course.",
     });
 }
+
+export function studentInviteEmailTemplate({ name, inviterName, link }) {
+    const safeName = escapeHtml(name);
+    const safeInviterName = escapeHtml(inviterName || "TernKonnect Academy");
+    const safeLink = escapeHtml(link);
+
+    return emailLayout({
+        preview:
+            "You have been invited to join TernKonnect Academy as a learner.",
+        eyebrow: "Student invitation",
+        title: "You're invited to TernKonnect Academy",
+        body: `
+      <p style="margin:0 0 16px;">Hello ${safeName},</p>
+      <p style="margin:0 0 16px;">${safeInviterName} has invited you to join TernKonnect Academy. An account has been created for you — just click the button below to set your password and start learning.</p>
+      <p style="margin:0;">For your security, this invitation expires in 7 days.</p>
+    `,
+        action: {
+            href: safeLink,
+            label: "Set Your Password",
+        },
+        secondary: `
+      <p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:#71717a;">Button not working? Copy and paste this secure invitation link into your browser:</p>
+      <p style="margin:0;word-break:break-all;font-size:13px;line-height:1.6;color:#3f3f46;">${safeLink}</p>
+    `,
+        footerNote:
+            "If you were not expecting this invitation, you can safely ignore this email.",
+    });
+}
+

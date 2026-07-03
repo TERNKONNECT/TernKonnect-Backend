@@ -76,6 +76,17 @@ function hasValidAdminInvite(user, token) {
   );
 }
 
+function hasValidStudentInvite(user, token) {
+  return (
+    user &&
+    user.role === "user" &&
+    user.passwordSetupRequired &&
+    user.adminInviteToken === hashValue(String(token)) &&
+    user.adminInviteExpires &&
+    user.adminInviteExpires > new Date()
+  );
+}
+
 // Public user registration
 router.post("/register", async (req, res) => {
   try {
@@ -273,6 +284,64 @@ router.post("/admin-invite/accept", async (req, res) => {
     });
 
     if (!hasValidAdminInvite(user, token)) {
+      return res.status(400).json({ error: "Invalid or expired invitation link" });
+    }
+
+    user.password = password;
+    user.passwordSetupRequired = false;
+    user.emailVerified = true;
+    user.adminInviteToken = null;
+    user.adminInviteExpires = null;
+    await user.save();
+
+    res.json({
+      message: "Password created successfully.",
+      token: signToken(user),
+      user: userPayload(user),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Student invitation verification and password setup
+router.get("/student-invite", async (req, res) => {
+  try {
+    const { token, email } = req.query;
+    if (!token || !email)
+      return res.status(400).json({ error: "Invitation token is required" });
+
+    const user = await User.findOne({
+      where: { email: normalizeEmail(String(email)) },
+    });
+
+    if (!hasValidStudentInvite(user, token)) {
+      return res.status(400).json({ error: "Invalid or expired invitation link" });
+    }
+
+    res.json({
+      name: user.name,
+      email: user.email,
+      expiresAt: user.adminInviteExpires,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/student-invite/accept", async (req, res) => {
+  try {
+    const { token, email, password } = req.body;
+    if (!token || !email || !password)
+      return res.status(400).json({ error: "Email, token, and password are required" });
+    if (password.length < 6)
+      return res.status(400).json({ error: "Password must be at least 6 characters" });
+
+    const user = await User.findOne({
+      where: { email: normalizeEmail(email) },
+    });
+
+    if (!hasValidStudentInvite(user, token)) {
       return res.status(400).json({ error: "Invalid or expired invitation link" });
     }
 
