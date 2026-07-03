@@ -1,5 +1,6 @@
 import express from "express";
 import crypto from "crypto";
+import multer from "multer";
 import User from "../models/User.js";
 import Course from "../models/Course.js";
 import Module from "../models/Module.js";
@@ -11,6 +12,7 @@ import Payment from "../models/Payment.js";
 import sequelize from "../config/db.js";
 import {
   adminInviteEmailTemplate,
+  studentInviteEmailTemplate,
   appUrl,
   sendEmail,
 } from "../config/email.js";
@@ -18,6 +20,7 @@ import { protect, adminOnly, superAdminOnly, strictAdminOnly } from "../middlewa
 import { Op } from "sequelize";
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 const hashValue = (value) =>
   crypto.createHash("sha256").update(value).digest("hex");
@@ -576,5 +579,149 @@ router.get("/popular-courses", protect, adminOnly, async (req, res) => {
 router.get("/quiz-success", protect, adminOnly, async (_req, res) => {
   res.json({ labels: [], passed: [], failed: [] });
 });
+
+// ── Bulk student onboarding ───────────────────────────────────────────────────
+
+// GET /api/superadmin/bulk-onboard/template — download CSV template
+router.get("/bulk-onboard/template", protect, superAdminOnly, (_req, res) => {
+  const csv = "firstname,lastname,email\n";
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", 'attachment; filename="student_onboard_template.csv"');
+  res.send(csv);
+});
+
+// POST /api/superadmin/bulk-onboard/upload — upload filled CSV
+router.post(
+  "/bulk-onboard/upload",
+  protect,
+  superAdminOnly,
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No CSV file uploaded" });
+
+      const content = req.file.buffer.toString("utf-8");
+      const lines = content
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      if (lines.length < 2) {
+        return res.status(400).json({ error: "CSV file is empty or has no data rows" });
+      }
+
+      // Parse header
+      const header = lines[0].toLowerCase().split(",").map((h) => h.trim());
+      const firstnameIdx = header.indexOf("firstname");
+      const lastnameIdx = header.indexOf("lastname");
+      const emailIdx = header.indexOf("email");
+
+      if (firstnameIdx === -1 || lastnameIdx === -1 || emailIdx === -1) {
+        return res.status(400).json({
+          error: "CSV must have columns: firstname, lastname, email",
+        });
+      }
+
+      const inviter = await User.findByPk(req.user.id, { attributes: ["name"] });
+      const inviterName = inviter?.name || "TernKonnect Academy";
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      const results = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map((c) => c.trim());
+        const firstname = cols[firstnameIdx] || "";
+        const lastname = cols[lastnameIdx] || "";
+        const rawEmail = cols[emailIdx] || "";
+        const email = rawEmail.toLowerCase().trim();
+        const name = `${firstname} ${lastname}`.trim();
+        const row = i + 1;
+
+        if (!firstname || !email) {
+          results.push({ row, email: rawEmail, status: "failed", reason: "Missing firstname or email" });
+          continue;
+        }
+
+        if (!EMAIL_RE.test(email)) {
+          results.push({ row, email, status: "failed", reason: "Invalid email format" });
+          continue;
+        }
+
+        try {
+          const existing = await User.findOne({ where: { email } });
+
+          if (existing && !existing.passwordSetupRequired) {
+            results.push({ row, email, status: "skipped", reason: "User already exists" });
+            continue;
+          }
+
+          const token = crypto.randomBytes(32).toString("hex");
+          const temporaryPassword = crypto.randomBytes(32).toString("hex");
+
+          const user =
+            existing ||
+            (await User.create({
+              name,
+              email,
+              password: temporaryPassword,
+              role: "user",
+              userType: "learner",
+              emailVerified: true,
+              passwordSetupRequired: true,
+            }));
+
+          // Update invite fields (also refreshes if re-inviting a pending user)
+          user.name = name;
+          user.adminInviteToken = hashValue(token);
+          user.adminInviteExpires = tokenExpiry(7);
+          user.passwordSetupRequired = true;
+          await user.save();
+
+          const link = appUrl(
+            `/student-invite?token=${token}&email=${encodeURIComponent(email)}`,
+          );
+
+          let emailSent = true;
+          try {
+            await sendEmail({
+              to: email,
+              subject: "You're invited to join TernKonnect Academy",
+              html: studentInviteEmailTemplate({ name, inviterName, link }),
+            });
+          } catch (emailErr) {
+            emailSent = false;
+            console.error(`Invite email failed for ${email}:`, emailErr.message);
+            console.warn(`Manual invite link for ${email}: ${link}`);
+          }
+
+          results.push({
+            row,
+            email,
+            status: existing ? "re-invited" : "created",
+            emailSent,
+          });
+        } catch (err) {
+          results.push({ row, email, status: "failed", reason: err.message });
+        }
+      }
+
+      const created = results.filter((r) => r.status === "created").length;
+      const reInvited = results.filter((r) => r.status === "re-invited").length;
+      const skipped = results.filter((r) => r.status === "skipped").length;
+      const failed = results.filter((r) => r.status === "failed").length;
+
+      res.json({
+        total: results.length,
+        created,
+        reInvited,
+        skipped,
+        failed,
+        details: results,
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
 
 export default router;

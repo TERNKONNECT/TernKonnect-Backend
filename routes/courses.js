@@ -68,9 +68,10 @@ router.get("/", async (req, res) => {
     const authHeader = req.headers.authorization;
     let where = {};
     let isSuperAdmin = false;
-    const { targetAudience } = req.query;
+    const { targetAudience, scope } = req.query;
 
-    if (authHeader) {
+    if (scope === "admin" && authHeader) {
+      // ── Admin dashboard view: show only courses owned by this admin ──
       try {
         const jwt = await import("jsonwebtoken");
         const decoded = jwt.default.verify(
@@ -81,11 +82,13 @@ router.get("/", async (req, res) => {
           where = { createdBy: decoded.id };
         } else if (decoded.role === "super-admin") {
           isSuperAdmin = true;
+          // super-admin sees all courses in admin dashboard
         }
       } catch {
         where = { status: "published" };
       }
     } else {
+      // ── Public catalog: always show all published courses ──
       where = { status: "published" };
     }
 
