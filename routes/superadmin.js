@@ -189,12 +189,13 @@ router.post("/instructors/invite", protect, strictAdminOnly, async (req, res) =>
     if (!name || !email)
       return res.status(400).json({ error: "Name and email are required" });
 
-    const inviteRole = role === "operator" ? "operator" : "admin";
+    const allowedRoles = ["admin", "operator", "super-admin"];
+    const inviteRole = allowedRoles.includes(role) ? role : "admin";
 
     const normalizedEmail = normalizeEmail(email);
     const existing = await User.findOne({ where: { email: normalizedEmail } });
 
-    if (existing && existing.role !== "admin" && existing.role !== "operator" && existing.role !== "user") {
+    if (existing && !["admin", "operator", "super-admin", "user"].includes(existing.role)) {
       return res.status(400).json({
         error: "This email already belongs to another account.",
       });
@@ -221,7 +222,7 @@ router.post("/instructors/invite", protect, strictAdminOnly, async (req, res) =>
       }));
 
     admin.name = String(name).trim();
-    if (!existing) admin.role = inviteRole;
+    admin.role = inviteRole;
     admin.adminInviteToken = hashValue(token);
     admin.adminInviteExpires = tokenExpiry(7);
     admin.passwordSetupRequired = true;
@@ -232,20 +233,27 @@ router.post("/instructors/invite", protect, strictAdminOnly, async (req, res) =>
       `/admin-invite?token=${token}&email=${encodeURIComponent(admin.email)}`,
     );
 
-    await sendEmail({
-      to: admin.email,
-      subject: "You have been invited to become a TernKonnect Academy admin",
-      html: adminInviteEmailTemplate({
-        name: admin.name,
-        inviterName: inviter?.name || "A super admin",
-        link,
-      }),
-    });
+    let emailSent = true;
+    try {
+      await sendEmail({
+        to: admin.email,
+        subject: "You have been invited to become a TernKonnect Academy admin",
+        html: adminInviteEmailTemplate({
+          name: admin.name,
+          inviterName: inviter?.name || "A super admin",
+          link,
+        }),
+      });
+    } catch (emailErr) {
+      emailSent = false;
+      console.error(`Invite email failed for ${admin.email}:`, emailErr.message);
+      console.warn(`Manual invite link for ${admin.email}: ${link}`);
+    }
 
     res.status(existing ? 200 : 201).json({
       message: existing
-        ? "Admin invitation resent successfully."
-        : "Admin invitation sent successfully.",
+        ? `Admin invitation resent successfully.${!emailSent ? " (Email delivery failed — share the invite link manually.)" : ""}`
+        : `Admin invitation sent successfully.${!emailSent ? " (Email delivery failed — share the invite link manually.)" : ""}`,
       instructor: {
         id: admin.id,
         name: admin.name,
