@@ -137,6 +137,25 @@ async function ensurePaymentTable() {
   console.log("Created missing payments table");
 }
 
+async function ensureEnrollmentColumns() {
+  const queryInterface = sequelize.getQueryInterface();
+  let table;
+  try {
+    table = await queryInterface.describeTable("enrollments");
+  } catch (err) {
+    console.log("enrollments table not found, skipping enrollment columns");
+  }
+
+  if (table && !table.enrolledBy) {
+    await queryInterface.addColumn("enrollments", "enrolledBy", {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: "users", key: "id" },
+    });
+    console.log("Added missing enrollments.enrolledBy column");
+  }
+}
+
 export async function connectDB() {
   if (isConnected) return;
   if (connectionPromise) return connectionPromise;
@@ -146,6 +165,7 @@ export async function connectDB() {
       await sequelize.authenticate();
       await ensureUserColumns();
       await ensurePaymentTable();
+      await ensureEnrollmentColumns();
       isConnected = true;
       console.log("PostgreSQL connected");
     } catch (err) {
