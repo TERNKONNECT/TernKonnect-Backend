@@ -323,10 +323,15 @@ router.get("/admin/courses/:courseId", protect, adminOnly, async (req, res) => {
     if (req.user.role === "admin" && course.createdBy !== req.user.id)
       return res.status(403).json({ error: "Not authorized" });
 
+    const where = { courseId: req.params.courseId };
+    if (req.query.source === "admin") where.enrolledBy = { [Op.ne]: null };
+    else if (req.query.source === "self") where.enrolledBy = null;
+
     const enrollments = await Enrollment.findAll({
-      where: { courseId: req.params.courseId },
+      where,
       include: [
         { model: User, attributes: ["id", "name", "email", "createdAt"] },
+        { model: User, as: "EnrolledByAdmin", attributes: ["id", "name"] },
       ],
       order: [["createdAt", "DESC"]],
     });
@@ -352,6 +357,9 @@ router.get("/admin/courses/:courseId", protect, adminOnly, async (req, res) => {
           isCompleted: e.isCompleted,
           completedAt: e.completedAt,
           user: e.User,
+          enrolledByAdmin: e.EnrolledByAdmin
+            ? { id: e.EnrolledByAdmin.id, name: e.EnrolledByAdmin.name }
+            : null,
           totalLessons,
           completedLessons,
           progressPct:
@@ -363,7 +371,7 @@ router.get("/admin/courses/:courseId", protect, adminOnly, async (req, res) => {
     );
 
     res.json({
-      course: { id: course.id, title: course.title },
+      course: { id: course.id, title: course.title, pricingType: course.pricingType },
       totalEnrolled: result.length,
       totalCompleted: result.filter((r) => r.isCompleted).length,
       students: result,
@@ -450,7 +458,7 @@ router.post("/admin/enroll", protect, adminOnly, async (req, res) => {
     // Create enrollment (or detect duplicate)
     const [enrollment, created] = await Enrollment.findOrCreate({
       where: { userId: user.id, courseId },
-      defaults: { userId: user.id, courseId },
+      defaults: { userId: user.id, courseId, enrolledBy: req.user.id },
     });
 
     if (!created) {
