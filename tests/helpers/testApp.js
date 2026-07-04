@@ -4,9 +4,16 @@ import express from "express";
 // server.js mounts them, without connecting to a real database. Pass either a
 // single { path, router } or an array of them for routers that depend on
 // params from a parent mount (e.g. lessons.js needs :courseId/:moduleId).
-export function buildApp(mounts) {
+export function buildApp(mounts, { captureRawBody = false } = {}) {
   const app = express();
-  app.use(express.json());
+  // server.js captures the raw request body so the Paystack webhook can verify
+  // its HMAC signature against the exact bytes received — replicate that here
+  // rather than the default express.json(), which only exposes the parsed body.
+  app.use(
+    captureRawBody
+      ? express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } })
+      : express.json(),
+  );
 
   const list = Array.isArray(mounts) ? mounts : [mounts];
   for (const { path, router } of list) {
