@@ -8,6 +8,7 @@ import Lesson from "../models/Lesson.js";
 import Module from "../models/Module.js";
 import Enrollment from "../models/Enrollment.js";
 import LessonProgress from "../models/LessonProgress.js";
+import Certificate from "../models/Certificate.js";
 import { buildApp } from "./helpers/testApp.js";
 import { stub } from "./helpers/stub.js";
 import { authHeader } from "./helpers/token.js";
@@ -142,6 +143,8 @@ test("POST .../lessons/:lessonId/complete marks the course completed once every 
   t.after(stub(LessonProgress, "findOrCreate", async () => [{ id: "prog-4" }, true]));
   t.after(stub(Lesson, "count", async () => 4));
   t.after(stub(LessonProgress, "count", async () => 4));
+  t.after(stub(Certificate, "findOne", async () => ({ certificateId: "TK-MOCK123" })));
+  t.after(stub(Certificate, "create", async () => ({})));
 
   const res = await request(enrollmentApp)
     .post(`/api/enrollments/${COURSE_ID}/lessons/lesson-4/complete`)
@@ -159,6 +162,7 @@ test("POST .../lessons/:lessonId/complete does not double-count an already-compl
   t.after(stub(LessonProgress, "findOrCreate", async () => [{ id: "prog-1" }, false]));
   t.after(stub(Lesson, "count", async () => 4));
   t.after(stub(LessonProgress, "count", async () => 1));
+  t.after(stub(Certificate, "findOne", async () => null));
 
   const res = await request(enrollmentApp)
     .post(`/api/enrollments/${COURSE_ID}/lessons/lesson-1/complete`)

@@ -17,7 +17,9 @@ import superAdminRoutes from "./routes/superadmin.js";
 import profileRoutes from "./routes/profile.js";
 import reviewRoutes from "./routes/reviews.js";
 import "./models/Payment.js";
+import "./models/Certificate.js";
 import paymentRoutes from "./routes/payment.js";
+import certificateRoutes from "./routes/certificates.js";
 
 setupCourseAssociations(User);
 const dbReady = connectDB();
@@ -78,6 +80,7 @@ app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/certificates", certificateRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.get("/", (req, res) => res.send("API is running"));

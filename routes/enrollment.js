@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import { Op } from "sequelize";
 import Enrollment from "../models/Enrollment.js";
 import LessonProgress from "../models/LessonProgress.js";
@@ -6,6 +7,7 @@ import User from "../models/User.js";
 import Course from "../models/Course.js";
 import Module from "../models/Module.js";
 import Lesson from "../models/Lesson.js";
+import Certificate from "../models/Certificate.js";
 import { protect, adminOnly } from "../middleware/auth.js";
 import sequelize from "../config/db.js";
 
@@ -61,6 +63,8 @@ router.get("/my", protect, async (req, res) => {
             ? Math.round((completedLessons / totalLessons) * 100)
             : 0;
 
+        const cert = await Certificate.findOne({ where: { enrollmentId: e.id } });
+
         return {
           enrollmentId: e.id,
           enrolledAt: e.createdAt,
@@ -71,6 +75,7 @@ router.get("/my", protect, async (req, res) => {
           completedLessons,
           completedLessonIds: completedLessonRows.map((progress) => progress.lessonId),
           progressPct,
+          certificateId: cert ? cert.certificateId : null,
         };
       }),
     );
@@ -137,7 +142,26 @@ router.post(
       });
 
       if (totalLessons > 0 && completedLessons >= totalLessons) {
-        await enrollment.update({ isCompleted: true, completedAt: new Date() });
+        if (!enrollment.isCompleted) {
+          await enrollment.update({ isCompleted: true, completedAt: new Date() });
+        }
+        
+        let cert = await Certificate.findOne({ where: { enrollmentId: enrollment.id } });
+        if (!cert) {
+          let certId;
+          let isUnique = false;
+          while (!isUnique) {
+            certId = "TK-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+            const check = await Certificate.findOne({ where: { certificateId: certId } });
+            if (!check) isUnique = true;
+          }
+          cert = await Certificate.create({
+            certificateId: certId,
+            userId: enrollment.userId,
+            courseId: enrollment.courseId,
+            enrollmentId: enrollment.id,
+          });
+        }
       }
 
       res.json({
@@ -147,6 +171,8 @@ router.post(
         completedLessons,
         progressPct: Math.round((completedLessons / totalLessons) * 100),
         courseCompleted: enrollment.isCompleted,
+        certificateId: (totalLessons > 0 && completedLessons >= totalLessons) ? 
+          (await Certificate.findOne({ where: { enrollmentId: enrollment.id } }))?.certificateId : null,
       });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -226,6 +252,7 @@ router.get("/:courseId/progress", protect, async (req, res) => {
           progressPct: 0,
           completedLessonIds: [],
           quizAttempts: [],
+          certificateId: null,
         });
       }
       return res.status(404).json({ error: "Not enrolled" });
@@ -258,6 +285,8 @@ router.get("/:courseId/progress", protect, async (req, res) => {
           : 0,
       completedLessonIds: completedLessons.map((p) => p.lessonId),
       quizAttempts: enrollment.quizAttempts ?? [],
+      certificateId: enrollment.isCompleted ? 
+        (await Certificate.findOne({ where: { enrollmentId: enrollment.id } }))?.certificateId : null,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

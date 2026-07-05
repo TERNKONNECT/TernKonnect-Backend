@@ -11,6 +11,7 @@ import TrialSignup from "../models/TrialSignup.js";
 import Video from "../models/Video.js";
 import "../models/Payment.js";
 import "../models/Review.js";
+import "../models/Certificate.js";
 
 // Ensure associations are initialized before syncing
 setupCourseAssociations(User);

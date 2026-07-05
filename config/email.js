@@ -1,3 +1,5 @@
+import AWS from "aws-sdk";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 const DEFAULT_FROM = "TernKonnect Academy <no-reply@ternkonnect.com>";
 const BRAND_NAME = "TernKonnect Academy";
@@ -26,6 +28,29 @@ function getFromAddress() {
 }
 
 export async function sendEmail({ to, subject, html }) {
+    if (isProduction()) {
+        AWS.config.update({ region: process.env.AWS_REGION || "us-east-1" });
+        const ses = new AWS.SES({ apiVersion: "2010-12-01" });
+        const params = {
+            Destination: { ToAddresses: [to] },
+            Message: {
+                Body: {
+                    Html: { Charset: "UTF-8", Data: html },
+                },
+                Subject: { Charset: "UTF-8", Data: subject },
+            },
+            Source: getFromAddress(),
+        };
+
+        try {
+            const data = await ses.sendEmail(params).promise();
+            return data;
+        } catch (error) {
+            console.error("AWS SES Error:", error);
+            throw new Error(error.message || "Failed to send email via AWS SES");
+        }
+    }
+
     if (!process.env.RESEND_API_KEY) {
         throw new Error("RESEND_API_KEY is not configured");
     }
