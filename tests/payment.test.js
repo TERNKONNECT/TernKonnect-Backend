@@ -182,7 +182,7 @@ test("GET /verify/:reference requires authentication", async () => {
   assert.equal(res.status, 401);
 });
 
-test("GET /verify/:reference 404s when the payment doesn't belong to the caller", async (t) => {
+test("GET /verify/:reference 404s when the payment is completely missing", async (t) => {
   t.after(stub(Payment, "findOne", async () => null));
 
   const res = await request(app)
@@ -190,6 +190,18 @@ test("GET /verify/:reference 404s when the payment doesn't belong to the caller"
     .set("Authorization", authHeader({ id: "student-1", role: "user" }));
 
   assert.equal(res.status, 404);
+});
+
+test("GET /verify/:reference 403s when the payment doesn't belong to the caller", async (t) => {
+  const payment = paymentFixture({ userId: "student-2" });
+  t.after(stub(Payment, "findOne", async () => payment));
+
+  const res = await request(app)
+    .get(`/api/payments/verify/${payment.reference}`)
+    .set("Authorization", authHeader({ id: "student-1", role: "user" }));
+
+  assert.equal(res.status, 403);
+  assert.match(res.body.error, /belongs to a different user/i);
 });
 
 test("GET /verify/:reference grants access once Paystack confirms success", async (t) => {
