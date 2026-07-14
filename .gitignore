@@ -37,3 +37,5 @@ dist-ssr
 
 
 .serverless
+.csv
+names_emails_split 1.csv
